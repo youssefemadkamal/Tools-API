@@ -2,6 +2,8 @@ const express = require("express");
 const morgan = require("morgan");
 const toolRouter = require("./routes/tool.route")
 const app = express();
+const dbConnection = require("./config/dbConnection");
+dbConnection();
 
 app.use(express.json());
 app.use(morgan("dev"));
