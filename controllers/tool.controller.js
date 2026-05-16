@@ -1,98 +1,81 @@
 const { validationResult } = require("express-validator");
 const toolModel = require("../models/tool.model");
-const { Error } = require("mongoose");
+const appError = require("../utils/appError.js");
+const asyncWrapper = require("../middlewares/asyncWrapper.js");
+const statusMessages = require("../utils/statusMessages");
 
-let getAllTools = async (req, res) => {
-  try {
-    const tools = await toolModel.find();
-    res.status(200).json(tools);
-  } catch (err) {
-    console.error(err);
-    res
-      .status(500)
-      .json({ message: "internal server error", error: err.message });
+let getAllTools = asyncWrapper(async (req, res) => {
+  const query = req.query;
+
+  const limit = parseInt(query.limit) || 2;
+
+  const page = parseInt(query.page) || 1;
+
+  const skip = (page - 1) * limit;
+
+  const tools = await toolModel.find().limit(limit).skip(skip);
+
+  res.status(200).json({
+    status: statusMessages.SUCCESS,
+    data: tools,
+  });
+});
+
+let getToolById = asyncWrapper(async (req, res) => {
+  const toolId = req.params.toolId;
+
+  const tool = await toolModel.findById(toolId);
+
+  if (!tool) {
+    throw new appError(404, statusMessages.FAIL, "tool not found");
   }
-};
 
-let getToolById = async (req, res) => {
-  try {
-    const toolId = req.params.toolId;
-    const tool = await toolModel.findById(toolId);
-    if (!tool) {
-      return res.status(404).json({ message: "tool is not found" });
-    }
-    res.status(200).json({ tool: tool });
-  } catch (err) {
-    console.error(err.message);
-    res
-      .status(500)
-      .json({ message: "internal server error", error: err.message });
+  res.status(200).json({
+    status: statusMessages.SUCCESS,
+    data: tool,
+  });
+});
+
+let createTool = asyncWrapper(async (req, res) => {
+  const errors = validationResult(req);
+
+  if (!errors.isEmpty()) {
+    const errorString = JSON.stringify(errors.array());
+    throw new appError(400, statusMessages.FAIL, errorString);
   }
-};
 
-let createTool = async (req, res) => {
-  try {
-    const errors = validationResult(req);
+  const createdTool = await toolModel.create(req.body);
 
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        errors: errors.array(),
-      });
-    }
-    const createdTool = await toolModel.create(req.body);
+  res.status(201).json({
+    status: statusMessages.SUCCESS,
+    data: createdTool,
+  });
+});
 
-    res.status(201).json(createdTool);
-  } catch (err) {
-    console.error(err.message);
-    res
-      .status(500)
-      .json({ message: "internal server error", error: err.message });
+let editTool = asyncWrapper(async (req, res) => {
+  const tool = await toolModel.findByIdAndUpdate(req.params.toolId, req.body, {
+    new: true,
+  });
+
+  if (!tool) {
+    throw new appError(404, statusMessages.FAIL, "tool not found");
   }
-};
 
-let editTool = async (req, res) => {
-  try {
+  res.status(200).json({
+    status: statusMessages.SUCCESS,
+    data: tool,
+  });
+});
 
-    const tool = await toolModel.findByIdAndUpdate(req.params.toolId , req.body,{new:true});
+let deleteTool = asyncWrapper(async (req, res) => {
+  const deletedTool = await toolModel.findByIdAndDelete(req.params.toolId);
 
-    if (!tool) {
-      return res.status(404).json({
-        message: "Tool not found",
-      });
-    }
-
-    res.status(200).json(tool);
-  } catch (err) {
-    console.error(err.message);
-    res
-      .status(500)
-      .json({ message: "internal server error", error: err.message });
+  if (!deletedTool) {
+    throw new appError(404, statusMessages.FAIL, "tool not found");
   }
-};
-let deleteTool = async (req, res) => {
-  try {
 
-    const deletedTool = await toolModel.findByIdAndDelete(
-      req.params.toolId
-    );
-
-    if (!deletedTool) {
-      return res.status(404).json({
-        message: "Tool not found",
-      });
-    }
-
-    res.status(204).send();
-
-  } catch (err) {
-    console.error(err.message);
-
-    res.status(500).json({
-      message: "internal server error",
-      error: err.message,
-    });
-  }
-};
+  res.status(204).send();
+});
 
 module.exports = {
   deleteTool,
